@@ -2,52 +2,113 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Browser inference demo</title>
-
+    <title>Demo Nhận Diện Âm Thanh AI</title>
     <style>
-        #features {
-            width: 50%;
-            font-size: 18px;
-        }
-
-        #results {
-            font-family: monospace;
-            white-space: pre;
-        }
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        #results { font-size: 24px; font-weight: bold; color: #d32f2f; margin-top: 20px; white-space: pre; }
+        button { padding: 10px 20px; font-size: 18px; margin: 10px; cursor: pointer; }
+        .details { font-size: 16px; font-family: monospace; color: #333; text-align: left; display: inline-block; }
     </style>
 </head>
 <body>
-    <h1></h1>
-
-    <p>
-        <input type="text" id="features" placeholder="Paste your features here">
-    </p>
-    <p>
-        <button id="run-inference">Run inference</button>
-    </p>
-    <p id="results"></p>
+    <h1 id="status">Đang tải mô hình AI...</h1>
+    
+    <button id="btn-start" disabled>🎙️ Bật Mic & Nhận Diện</button>
+    <button id="btn-stop" disabled>🛑 Tắt Mic</button>
+    
+    <div id="results">Bấm "Bật Mic" để bắt đầu...</div>
+    <div class="details" id="details"></div>
 
     <script src="edge-impulse-standalone.js"></script>
     <script src="run-impulse.js"></script>
     <script>
+        let audioCtx;
+        let stream;
+        let processor;
+        let classifier;
+        let audioBuffer = [];
+
+        // Khởi tạo mô hình AI
         (async () => {
-            var classifier = new EdgeImpulseClassifier();
-            await classifier.init();
-
-            let project = classifier.getProjectInfo();
-            document.querySelector('h1').textContent = project.owner + ' / ' + project.name + ' (version ' + project.deploy_version + ')';
-
-            document.querySelector('#run-inference').onclick = () => {
-                try {
-                    let features = document.querySelector('#features').value.split(',').map(x => Number(x.trim()));
-                    let res = classifier.classify(features);
-                    document.querySelector('#results').textContent = JSON.stringify(res, null, 4);
-                }
-                catch (ex) {
-                    alert('Failed to classify: ' + (ex.message || ex.toString()));
-                }
-            };
+            try {
+                classifier = new EdgeImpulseClassifier();
+                await classifier.init();
+                document.getElementById('status').textContent = '✅ Mô hình đã sẵn sàng (16000Hz)!';
+                document.getElementById('btn-start').disabled = false;
+            } catch (err) {
+                document.getElementById('status').textContent = '❌ Lỗi tải mô hình!';
+                console.error(err);
+            }
         })();
+
+        // Xử lý bật Mic
+        document.getElementById('btn-start').onclick = async () => {
+            try {
+                // Xin quyền Mic
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // Cài đặt tần số lấy mẫu CHUẨN 16000Hz (Bắt buộc cho Spectrogram)
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+                const source = audioCtx.createMediaStreamSource(stream);
+
+                processor = audioCtx.createScriptProcessor(4096, 1, 1);
+                source.connect(processor);
+                processor.connect(audioCtx.destination);
+
+                document.getElementById('btn-start').disabled = true;
+                document.getElementById('btn-stop').disabled = false;
+                document.getElementById('results').textContent = 'Đang nghe...';
+
+                // Thu thập dữ liệu liên tục
+                processor.onaudioprocess = (e) => {
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    for (let i = 0; i < inputData.length; i++) {
+                        audioBuffer.push(inputData[i]);
+                        
+                        // Đủ 1 giây = 16000 mẫu -> Chạy AI
+                        if (audioBuffer.length === 16000) {
+                            let features = [...audioBuffer]; // copy mảng
+                            audioBuffer = []; // reset để thu giây tiếp theo
+                            
+                            try {
+                                let res = classifier.classify(features);
+                                
+                                // Tìm nhãn có tỷ lệ cao nhất
+                                let bestLabel = '';
+                                let bestScore = 0;
+                                res.result.classification.forEach(c => {
+                                    if(c.value > bestScore) {
+                                        bestScore = c.value;
+                                        bestLabel = c.label;
+                                    }
+                                });
+
+                                // In ra màn hình
+                                document.getElementById('results').textContent = `Dự đoán: ${bestLabel.toUpperCase()} (${(bestScore * 100).toFixed(1)}%)`;
+                                document.getElementById('details').textContent = JSON.stringify(res.result.classification, null, 4);
+                            } catch(err) {
+                                console.error('Lỗi phân loại:', err);
+                            }
+                        }
+                    }
+                };
+            } catch (err) {
+                alert('Lỗi truy cập Mic: Bạn chưa cấp quyền Microphone!');
+            }
+        };
+
+        // Xử lý tắt Mic
+        document.getElementById('btn-stop').onclick = () => {
+            if (processor) { processor.disconnect(); processor = null; }
+            if (audioCtx) { audioCtx.close(); }
+            if (stream) { stream.getTracks().forEach(t => t.stop()); }
+            
+            document.getElementById('btn-start').disabled = false;
+            document.getElementById('btn-stop').disabled = true;
+            audioBuffer = [];
+            document.getElementById('results').textContent = 'Đã dừng thu âm.';
+            document.getElementById('details').textContent = '';
+        };
     </script>
 </body>
 </html>
