@@ -47,7 +47,7 @@
                 // Xin quyền Mic
                 stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
-                // Cài đặt tần số lấy mẫu CHUẨN 16000Hz (Bắt buộc cho Spectrogram)
+                // Cài đặt tần số lấy mẫu CHUẨN 16000Hz
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
                 const source = audioCtx.createMediaStreamSource(stream);
 
@@ -57,7 +57,7 @@
 
                 document.getElementById('btn-start').disabled = true;
                 document.getElementById('btn-stop').disabled = false;
-                document.getElementById('results').textContent = 'Đang nghe...';
+                document.getElementById('results').textContent = 'Đang phân tích...';
 
                 // Thu thập dữ liệu liên tục
                 processor.onaudioprocess = (e) => {
@@ -73,10 +73,10 @@
                             try {
                                 let res = classifier.classify(features);
                                 
-                                // Tìm nhãn có tỷ lệ cao nhất
+                                // Tìm nhãn có tỷ lệ cao nhất (ĐÃ FIX LỖI TÊN BIẾN Ở ĐÂY)
                                 let bestLabel = '';
                                 let bestScore = 0;
-                                res.result.classification.forEach(c => {
+                                res.results.forEach(c => {
                                     if(c.value > bestScore) {
                                         bestScore = c.value;
                                         bestLabel = c.label;
@@ -85,7 +85,7 @@
 
                                 // In ra màn hình
                                 document.getElementById('results').textContent = `Dự đoán: ${bestLabel.toUpperCase()} (${(bestScore * 100).toFixed(1)}%)`;
-                                document.getElementById('details').textContent = JSON.stringify(res.result.classification, null, 4);
+                                document.getElementById('details').textContent = JSON.stringify(res.results, null, 4);
                             } catch(err) {
                                 console.error('Lỗi phân loại:', err);
                             }
