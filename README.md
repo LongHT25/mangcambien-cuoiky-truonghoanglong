@@ -4,7 +4,7 @@
 - **Tên đề tài:** Phân loại tiếng động vật quanh nhà (4 lớp) và tiếng ồn bằng Spectrogram kết hợp mạng 2D-CNN.
 
 ## Mô tả cấu trúc thư mục
-- `index.html`: Giao diện Web thu thập âm thanh thời gian thực (đã cấu hình tần số lấy mẫu 16000Hz).
+- `index.html`: Giao diện Web thu thập âm thanh thời gian thực (tần số lấy mẫu 16000Hz).
 - `edge-impulse-standalone.wasm` & `edge-impulse-standalone.js`: Khối mô hình AI (WebAssembly) đã được huấn luyện.
 - `run-impulse.js`: Script hỗ trợ khởi tạo mô hình.
 - `server.py`: Script khởi chạy máy chủ cục bộ (Localhost) để cấp đúng quyền MIME type cho tệp `.wasm`.
