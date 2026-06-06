@@ -12,28 +12,45 @@
 </head>
 <body>
     <h1 id="status">Đang tải mô hình AI...</h1>
-    
+
     <button id="btn-start" disabled>🎙️ Bật Mic & Nhận Diện</button>
     <button id="btn-stop" disabled>🛑 Tắt Mic</button>
-    
+
     <div id="results">Bấm "Bật Mic" để bắt đầu...</div>
     <div class="details" id="details"></div>
 
     <script src="edge-impulse-standalone.js"></script>
     <script src="run-impulse.js"></script>
     <script>
-        let audioCtx;
-        let stream;
-        let processor;
-        let classifier;
+        let audioCtx, stream, processor, classifier;
         let audioBuffer = [];
 
-        // Khởi tạo mô hình AI
+        const TARGET_SR = 16000;
+        const WINDOW_SIZE = 16000;
+        const HOP_SIZE = 4000;
+        const CONFIDENCE_THRESHOLD = 0.65;
+
+        // Resample linear interpolation
+        function resample(inputSamples, inputRate, outputRate) {
+            if (inputRate === outputRate) return inputSamples;
+            const ratio = inputRate / outputRate;
+            const outputLength = Math.round(inputSamples.length / ratio);
+            const output = new Float32Array(outputLength);
+            for (let i = 0; i < outputLength; i++) {
+                const src = i * ratio;
+                const lo = Math.floor(src);
+                const hi = Math.min(lo + 1, inputSamples.length - 1);
+                const t = src - lo;
+                output[i] = inputSamples[lo] * (1 - t) + inputSamples[hi] * t;
+            }
+            return output;
+        }
+
         (async () => {
             try {
                 classifier = new EdgeImpulseClassifier();
                 await classifier.init();
-                document.getElementById('status').textContent = '✅ Mô hình đã sẵn sàng (16000Hz)!';
+                document.getElementById('status').textContent = '✅ Mô hình đã sẵn sàng!';
                 document.getElementById('btn-start').disabled = false;
             } catch (err) {
                 document.getElementById('status').textContent = '❌ Lỗi tải mô hình!';
@@ -41,16 +58,16 @@
             }
         })();
 
-        // Xử lý bật Mic
         document.getElementById('btn-start').onclick = async () => {
             try {
-                // Xin quyền Mic
                 stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                // Cài đặt tần số lấy mẫu CHUẨN 16000Hz
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-                const source = audioCtx.createMediaStreamSource(stream);
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const nativeSR = audioCtx.sampleRate;
 
+                document.getElementById('status').textContent =
+                    `✅ Browser SR: ${nativeSR}Hz → Resample 16000Hz`;
+
+                const source = audioCtx.createMediaStreamSource(stream);
                 processor = audioCtx.createScriptProcessor(4096, 1, 1);
                 source.connect(processor);
                 processor.connect(audioCtx.destination);
@@ -59,55 +76,63 @@
                 document.getElementById('btn-stop').disabled = false;
                 document.getElementById('results').textContent = 'Đang phân tích...';
 
-                // Thu thập dữ liệu liên tục
                 processor.onaudioprocess = (e) => {
                     const inputData = e.inputBuffer.getChannelData(0);
-                    for (let i = 0; i < inputData.length; i++) {
-                        audioBuffer.push(inputData[i]);
-                        
-                        // Đủ 1 giây = 16000 mẫu -> Chạy AI
-                        if (audioBuffer.length === 16000) {
-                            let features = [...audioBuffer]; // copy mảng
-                            audioBuffer = []; // reset để thu giây tiếp theo
-                            
-                            try {
-                                let res = classifier.classify(features);
-                                
-                                // Tìm nhãn có tỷ lệ cao nhất (ĐÃ FIX LỖI TÊN BIẾN Ở ĐÂY)
-                                let bestLabel = '';
-                                let bestScore = 0;
-                                res.results.forEach(c => {
-                                    if(c.value > bestScore) {
-                                        bestScore = c.value;
-                                        bestLabel = c.label;
-                                    }
-                                });
+                    const resampled = resample(inputData, nativeSR, TARGET_SR);
 
-                                // In ra màn hình
-                                document.getElementById('results').textContent = `Dự đoán: ${bestLabel.toUpperCase()} (${(bestScore * 100).toFixed(1)}%)`;
-                                document.getElementById('details').textContent = JSON.stringify(res.results, null, 4);
-                            } catch(err) {
-                                console.error('Lỗi phân loại:', err);
+                    for (let i = 0; i < resampled.length; i++) {
+                        audioBuffer.push(resampled[i]);
+                    }
+
+                    while (audioBuffer.length >= WINDOW_SIZE) {
+                        // ✅ Quan trọng: nhân 32768 để chuyển float32 → int16 range
+                        const features = audioBuffer.slice(0, WINDOW_SIZE).map(x => x * 32768);
+                        audioBuffer = audioBuffer.slice(HOP_SIZE);
+
+                        try {
+                            const res = classifier.classify(features);
+
+                            let bestLabel = '', bestScore = 0;
+                            res.results.forEach(c => {
+                                if (c.value > bestScore) {
+                                    bestScore = c.value;
+                                    bestLabel = c.label;
+                                }
+                            });
+
+                            if (bestScore >= CONFIDENCE_THRESHOLD) {
+                                document.getElementById('results').textContent =
+                                    `Dự đoán: ${bestLabel.toUpperCase()} (${(bestScore * 100).toFixed(1)}%)`;
+                            } else {
+                                document.getElementById('results').textContent =
+                                    `🤔 Không chắc: ${bestLabel} (${(bestScore * 100).toFixed(1)}%)`;
                             }
+
+                            document.getElementById('details').textContent =
+                                JSON.stringify(res.results, null, 4);
+
+                        } catch (err) {
+                            console.error('Lỗi phân loại:', err);
                         }
                     }
                 };
+
             } catch (err) {
                 alert('Lỗi truy cập Mic: Bạn chưa cấp quyền Microphone!');
             }
         };
 
-        // Xử lý tắt Mic
         document.getElementById('btn-stop').onclick = () => {
             if (processor) { processor.disconnect(); processor = null; }
-            if (audioCtx) { audioCtx.close(); }
-            if (stream) { stream.getTracks().forEach(t => t.stop()); }
-            
+            if (audioCtx)  { audioCtx.close(); audioCtx = null; }
+            if (stream)    { stream.getTracks().forEach(t => t.stop()); stream = null; }
+
+            audioBuffer = [];
             document.getElementById('btn-start').disabled = false;
             document.getElementById('btn-stop').disabled = true;
-            audioBuffer = [];
             document.getElementById('results').textContent = 'Đã dừng thu âm.';
             document.getElementById('details').textContent = '';
+            document.getElementById('status').textContent = '✅ Mô hình đã sẵn sàng!';
         };
     </script>
 </body>
