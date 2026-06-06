@@ -2,7 +2,6 @@
 
 - **Thành viên thực hiện:** Trương Hoàng Long - N23DCCI043
 - **Tên đề tài:** Phân loại tiếng động vật quanh nhà (4 lớp) và tiếng ồn bằng Spectrogram kết hợp mạng 2D-CNN.
-- **Link dự án Edge Impulse (Public):** [https://studio.edgeimpulse.com/public/162492/latest](https://studio.edgeimpulse.com/public/162492/latest)
 
 ## Mô tả cấu trúc thư mục
 - `index.html`: Giao diện Web thu thập âm thanh thời gian thực (đã cấu hình tần số lấy mẫu 16000Hz).
