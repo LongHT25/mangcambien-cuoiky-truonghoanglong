@@ -1,18 +1,24 @@
-# Đồ án môn Mạng Cảm Biến: Phân loại âm thanh động vật
+# Đồ án môn Mạng Cảm Biến
+
 - **Thành viên thực hiện:** Trương Hoàng Long - N23DCCI043
-- **Tên đề tài:** Nhận diện 4 loại âm thanh (Chó, Mèo, Gà, Chim) và Tiếng ồn bằng Spectrogram + 2D-CNN.
+- **Tên đề tài:** Phân loại tiếng động vật quanh nhà (4 lớp) và tiếng ồn bằng Spectrogram kết hợp mạng 2D-CNN.
+- **Link dự án Edge Impulse (Public):** [https://studio.edgeimpulse.com/public/162492/latest](https://studio.edgeimpulse.com/public/162492/latest)
 
-## Mô tả thư mục
-- `index.html`, `run-impulse.js`: Giao diện Web thu âm thời gian thực.
-- `edge-impulse-standalone.wasm`: Khối mô hình AI (WebAssembly).
-- `server.py`: Script khởi chạy server cục bộ.
+## Mô tả cấu trúc thư mục
+- `index.html`: Giao diện Web thu thập âm thanh thời gian thực (đã cấu hình tần số lấy mẫu 16000Hz).
+- `edge-impulse-standalone.wasm` & `edge-impulse-standalone.js`: Khối mô hình AI (WebAssembly) đã được huấn luyện.
+- `run-impulse.js`: Script hỗ trợ khởi tạo mô hình.
+- `server.py`: Script khởi chạy máy chủ cục bộ (Localhost) để cấp đúng quyền MIME type cho tệp `.wasm`.
 
-## Phụ thuộc (Dependencies)
+## Yêu cầu hệ thống (Dependencies)
 - Python 3.x
-- Trình duyệt web cấp quyền truy cập Microphone.
+- Trình duyệt web (Chrome, Edge, Safari...) có hỗ trợ và cho phép quyền truy cập Microphone.
 
-## Hướng dẫn cài đặt và chạy
-1. Tải toàn bộ source code về máy.
-2. Mở Terminal/Command Prompt tại thư mục chứa source code.
-3. Chạy lệnh: `python -m http.server 8082` (đối với Windows) hoặc `python3 server.py`.
-4. Truy cập trình duyệt tại địa chỉ: `http://localhost:8082`.
+## Hướng dẫn cài đặt và chạy thực nghiệm
+1. Tải toàn bộ mã nguồn về máy tính.
+2. Mở Terminal hoặc Command Prompt (CMD) tại thư mục chứa mã nguồn.
+3. Khởi chạy máy chủ ảo bằng lệnh sau:
+   ```bash
+   python server.py (Lưu ý: Trên MacOS hoặc Linux, vui lòng sử dụng lệnh python3 server.py)
+4. Mở trình duyệt web và truy cập vào địa chỉ: http://localhost:8082
+5. Cấp quyền truy cập Microphone khi trang web yêu cầu và bắt đầu quá trình nhận diện.
